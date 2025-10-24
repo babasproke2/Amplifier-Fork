@@ -4,4 +4,4 @@ The product is compressed and streamlined to give clients speedy downloads and t
 <img width="716" height="489" alt="image" src="https://github.com/user-attachments/assets/eec2376b-3340-49dd-aaf5-4f4796d6b618" />
 Provided convars include: Metal per player, max metal stored, effect distance, effect length, force enable amplifiers, enable explosions & damage value, enable enemy zap & damage value
 Files are downscaled and better compressed than their original versions; visit the AlliedModders source for original resources.
-Planned: Animated new model as an optional vpk for clients
+Planned: Animated new model as an optional vpk for clients, Engipads compatibility (my personal version integrattes https://github.com/Starblaster64/TF2-Engineer-Pads to control the Engipads cookie in the amplifier's menu)
