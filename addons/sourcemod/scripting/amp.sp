@@ -62,7 +62,6 @@ float EnableZap = 20.0;
 
 // Forward
 Handle fwdOnAmplify;
-Handle g_hPadCookie;
 
 // Native Control
 bool NativeControl;
@@ -121,14 +120,9 @@ public OnPluginStart()
 	
 	RegConsoleCmd("sm_amplifier", CallPanel, "Select engineer's building type");
 	RegConsoleCmd("sm_a", CallPanel, "Select engineer's building type");
-	RegConsoleCmd("sm_p", CallPanel, "Select engineer's building type");
 	RegConsoleCmd("sm_amp", CallPanel, "Select engineer's building type");
 	RegConsoleCmd("sm_amphelp", HelpPanel, "Show info about Amplifier");
-	RegConsoleCmd("sm_amphelp", HelpPanel, "Show info about Amplifier");
 	RegConsoleCmd("sm_ah", HelpPanel, "Show info about Amplifier");
-	RegConsoleCmd("sm_ph", HelpPanel, "Show info about Amplifier");
-
-	g_hPadCookie = FindClientCookie("engipads_toggle");
 
 	AutoExecConfig(true, "amplifier");
 	
@@ -317,11 +311,9 @@ public Action:HelpPanel(client, Args)
 	DrawPanelText(panel, "Amplifiers can replace Sentries or Dispensers");
 	DrawPanelText(panel, "They consume metal to provide mini crits to nearby teammates");
 	DrawPanelText(panel, "Hit with wrench to refill");
-	DrawPanelText(panel, "=== Jump/Speed Pad Info ===");
-	DrawPanelText(panel, "Teleporters can be converted to Jump or Speed pads");
-	DrawPanelText(panel, "Turn your pad once to place a jump pad instead of a speed pad");
+	DrawPanelText(panel, "The Amplifier explodes on death, and each pulse deals damage to enemies");
 	DrawPanelText(panel, "=== How To Use? ===");
-	DrawPanelText(panel, "Use !a or !p to toggle these buildings");
+	DrawPanelText(panel, "Use !amp or !a to open a menu and toggle the building.");
 	DrawPanelItem(panel, "Close");
 	
 	SendPanelToClient(panel, client, AmpHelpPanelH, 20);
@@ -335,12 +327,8 @@ public Action HelpPanel_Chat(int client, int Args)
     CPrintToChat(client, "{default}They consume metal to provide mini-crits to nearby teammates");
     CPrintToChat(client, "{default}Hit with wrench to refill");
 
-    CPrintToChat(client, "{lightgreen}=== Jump/Speed Pad Info ===");
-    CPrintToChat(client, "{default}Teleporters can be converted to Jump or Speed pads");
-    CPrintToChat(client, "{default}Turn your pad once to place a jump pad instead of a speed pad");
-
     CPrintToChat(client, "{blue}=== How To Use? ===");
-    CPrintToChat(client, "{default}Use {green}!a{default} or {green}!p{default} to toggle these buildings");
+    CPrintToChat(client, "{default}Use {green}!a{default} or {green}!p{default} to toggle the building");
 
     return Plugin_Handled;
 }
@@ -367,25 +355,11 @@ void ShowAmplifierMenu(client)
 	
 	Format(szItem, sizeof(szItem), "Dispenser: %s", UseAmplifierDisp[client] ? "[✓] Amplifier" : "[  ] Normal");
 	AddMenuItem(menu, "disp", szItem);
-
-	// I've added Engipads to this nice menu
-	bool usePadSpeed = GetClientCookieBool(client, g_hPadCookie);
-
-	Format(szItem, sizeof(szItem), "Teleporters: %s", usePadSpeed ? "[✓] Speed/Jump" : "[  ] Normal");
-	AddMenuItem(menu, "tele", szItem);
 	
 	AddMenuItem(menu, "info", "── Help & Info ──");
 	
 	SetMenuExitButton(menu, true);
 	DisplayMenu(menu, client, MENU_TIME_FOREVER);
-}
-
-// Engipads attachment
-bool GetClientCookieBool(int client, Handle cookie)
-{
-    char value[8];
-    GetClientCookie(client, cookie, value, sizeof(value));
-    return (StrEqual(value, "1") || StrEqual(value, "true"));
 }
 
 public MenuHandler_Amplifier(Handle:menu, MenuAction:action, param1, param2)
@@ -435,19 +409,6 @@ public MenuHandler_Amplifier(Handle:menu, MenuAction:action, param1, param2)
 		{
 			HelpPanel(param1, 0);
 		} 
-		else if (StrEqual(info, "tele"))
-		{
-			bool usePadSpeed = GetClientCookieBool(param1, g_hPadCookie);
-			usePadSpeed = !usePadSpeed; // toggle it
-
-			char szToggle[8];
-			Format(szToggle, sizeof(szToggle), "%s", usePadSpeed ? "1" : "0");
-
-			SetClientCookie(param1, g_hPadCookie, szToggle);
-
-			PrintToChat(param1, "[SM] Teleporter mode set to: %s", usePadSpeed ? "Speed/Jump" : "Normal");
-			ShowAmplifierMenu(param1);
-		}
 	}
 	else if (action == MenuAction_End)
 	{
