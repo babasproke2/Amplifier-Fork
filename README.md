@@ -1,2 +1,7 @@
 # Amplifier-Fork
 This is a recreation of the Sourcemod TF2 Amplifier by Eggman @ https://forums.alliedmods.net/showthread.php?t=126846
+The product is compressed and streamlined to give clients speedy downloads and to provide a drag-and-drop experience for server providers.
+<img width="716" height="489" alt="image" src="https://github.com/user-attachments/assets/eec2376b-3340-49dd-aaf5-4f4796d6b618" />
+Provided convars include: Metal per player, max metal stored, effect distance, effect length, force enable amplifiers, enable explosions & damage value, enable enemy zap & damage value
+Files are downscaled and better compressed than their original versions; visit the AlliedModders source for original resources.
+Planned: Animated new model as an optional vpk for clients
