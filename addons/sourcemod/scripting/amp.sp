@@ -71,8 +71,8 @@ ConVar cvarEnableZap;
 int MetalPerPlayer = 5;
 int MetalMax = 200;
 TFCond DefaultCondition = TFCond_RuneHaste; // Formerly TFCond_Buffed
-float DefaultDistance = 225.0;
-float DefaultEffectLength = 4.0;
+float DefaultDistance = 400.0;
+float DefaultEffectLength = 5.0;
 int ForceAmplifier = 0; // 0=nothing, 1=dispenser, 2=sentry, 3=both
 int EnableExplosion = 65;
 int EnableZap = 0; // I prefer 20
@@ -144,13 +144,13 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 public OnPluginStart()
 {
 	CreateConVar("amplifier_version", PLUGIN_VERSION, "The Amplifier Version", FCVAR_REPLICATED|FCVAR_NOTIFY);
-	cvarEffectLength = CreateConVar("amplifier_effect_length", "2.5", "Length in seconds for the Amplifier condition to last", FCVAR_PLUGIN);
-	cvarDistance = CreateConVar("amplifier_distance", "240.0", "Distance the amplifier works.", FCVAR_PLUGIN);
+	cvarEffectLength = CreateConVar("amplifier_effect_length", "5.0", "Length in seconds for the Amplifier condition to last", FCVAR_PLUGIN);
+	cvarDistance = CreateConVar("amplifier_distance", "400.0", "Distance the amplifier works.", FCVAR_PLUGIN);
 	cvarMetalMax = CreateConVar("amplifier_max", "200.0", "Maximum amount of metal an amplifier can hold.", FCVAR_PLUGIN);
 	cvarMetal = CreateConVar("amplifier_metal", "5.0", "Amount of metal to use to apply a condition to a player (per second).", FCVAR_PLUGIN);
 	cvarForceAmplifier = CreateConVar("amplifier_force", "0", "Force amplifier mode: 0=nothing, 1=dispenser, 2=sentry, 3=both", FCVAR_PLUGIN, true, 0.0, true, 3.0);
 	cvarEnableExplosion = CreateConVar("amplifier_explode", "65", "Enable Amplifier death explosions? >0 for damage value.", FCVAR_PLUGIN, true, 0.0, true, 1.0);
-	cvarEnableZap = CreateConVar("amplifier_zap", "0", "Should Amplifier pulses harm the enemy team? 0 to disable, >0 for damage.", FCVAR_PLUGIN, true, 0.0, true, 50.0);
+	cvarEnableZap = CreateConVar("amplifier_zap", "20.0", "Should Amplifier pulses harm the enemy team? 0 to disable, >0 for damage.", FCVAR_PLUGIN, true, 0.0, true, 50.0);
 
 	HookEvent("player_builtobject", Event_Build);
     HookEvent("object_destroyed", Event_ObjectDestroyed);
@@ -164,6 +164,7 @@ public OnPluginStart()
 	RegConsoleCmd("sm_amphelp", HelpPanel, "Show info about Amplifier");
 	RegConsoleCmd("sm_ah", HelpPanel, "Show info about Amplifier");
 	RegConsoleCmd("sm_ph", HelpPanel, "Show info about Amplifier");
+	RegConsoleCmd("sm_killsentries", Command_KillSentries, "Destroy all sentry guns");
 
 	g_hPadCookie = FindClientCookie("engipads_toggle");
 
@@ -368,8 +369,8 @@ public Action:HelpPanel(client, Args)
 	new Handle:panel = CreatePanel();
 	
 	SetPanelTitle(panel, "=== Amplifier Info ===");
-	DrawPanelText(panel, "Amplifiers can replace Sentries or Dispensers");
-	DrawPanelText(panel, "They consume metal to provide a fire rate and reload speed bonus to nearby teammates");
+	DrawPanelText(panel, "Amplifiers consume metal to provide a powerful combat buff to nearby teammates for 5 seconds");
+	DrawPanelText(panel, "It applies the Concheror effect and a 25% bonus to reload speed & fire rate");
 	DrawPanelText(panel, "Hit with wrench to refill");
 	DrawPanelText(panel, "=== Jump/Speed Pad Info ===");
 	DrawPanelText(panel, "Teleporters can be converted to Jump or Speed pads");
@@ -773,9 +774,9 @@ public Action Event_ObjectDestroyed(Event event, const char[] name, bool dontBro
 
 CheckBuilding(ent)
 {
-	new String:classname[64];
-	new Client = GetEntPropEnt(ent, Prop_Send, "m_hBuilder");
-	GetEdictClassname(ent, classname, sizeof(classname));
+    new String:classname[64];
+    new Client = GetEntPropEnt(ent, Prop_Send, "m_hBuilder");
+    GetEdictClassname(ent, classname, sizeof(classname));
 	
 	bool isDispenser = !strcmp(classname, "obj_dispenser");
 	bool isSentry = !strcmp(classname, "obj_sentrygun");
@@ -784,12 +785,13 @@ CheckBuilding(ent)
 	
 	BuildingRef[ent] = EntIndexToEntRef(ent);
 	
-	bool shouldConvert = false;
+    bool shouldConvert = false;
+    bool forcedConversion = false;
 	
 	// Check force mode
-	if (ForceAmplifier == 1 && isDispenser) shouldConvert = true;
-	else if (ForceAmplifier == 2 && isSentry) shouldConvert = true;
-	else if (ForceAmplifier == 3) shouldConvert = true;
+    if (ForceAmplifier == 1 && isDispenser) { shouldConvert = true; forcedConversion = true; }
+    else if (ForceAmplifier == 2 && isSentry) { shouldConvert = true; forcedConversion = true; }
+    else if (ForceAmplifier == 3) { shouldConvert = true; forcedConversion = true; }
 	// Check custom attributes
 	else if (isDispenser && CheckAmpAttributesDisp(Client)) shouldConvert = true;
 	else if (isSentry && CheckAmpAttributesSentry(Client)) shouldConvert = true;
@@ -797,10 +799,10 @@ CheckBuilding(ent)
 	else if (isDispenser && g_PlayerState[Client].useDispenser) shouldConvert = true;
 	else if (isSentry && g_PlayerState[Client].useSentry) shouldConvert = true;
 	
-	if (shouldConvert)
-	{
-		AmplifierOn[ent] = false;
-		SetEntProp(ent, Prop_Send, "m_bDisabled", 1);
+    if (shouldConvert)
+    {
+        AmplifierOn[ent] = false;
+        SetEntProp(ent, Prop_Send, "m_bDisabled", 1);
 		if (GetEntPropFloat(ent, Prop_Send, "m_flModelScale") != 1.0)
 		{
 			SetEntPropFloat(ent, Prop_Send, "m_flModelScale", 0.85); // Minis use 0.75... too small
@@ -825,8 +827,14 @@ CheckBuilding(ent)
 		Format(s, 128, "%s.mdl", AmplifierModel);
 		SetEntityModel(ent, s);
 		SetEntProp(ent, Prop_Send, "m_nSkin", GetEntProp(ent, Prop_Send, "m_nSkin") + 2);
-		CreateTimer(1.0, BuildingCheckStage1, EntIndexToEntRef(ent));
-	}
+        CreateTimer(1.0, BuildingCheckStage1, EntIndexToEntRef(ent));
+
+        // If force==2 (sentry) and this build was converted only because of force,
+        if (forcedConversion && ForceAmplifier == 2)
+        {
+            CPrintToChat(Client, "{orange}[Amplifier]{default} Sentries have been vote-disabled on this map or gamemode; have an Amplifier instead!");
+        }
+    }
 }
 
 public Action:BuildingCheckStage1(Handle hTimer, any:ref)
@@ -846,20 +854,24 @@ public Action:BuildingCheckStage2(Handle hTimer, any:ref)
 	
 	AmplifierOn[ent] = true;
 	new String:modelname[128];
-	char sHealth[16];
-	int health = 0;
-	if (AmplifierMini[ent])
-	{
-		health = AMPLIFIER_MINI_HEALTH;
-	} else health = AMPLIFIER_HEALTH; // Had issues with this due to how sourcemod handles each frame I assume
-	Format(sHealth, sizeof(sHealth), "%d", health);
 	Format(modelname, 128, "%s.mdl", AmplifierModel);
 	SetEntProp(ent, Prop_Send, "m_iUpgradeLevel", 1);
 	SetEntityModel(ent, modelname);
 
-	SetEntProp(ent, Prop_Send, "m_iMaxHealth", health);
-	SetVariantString(sHealth);
-	AcceptEntityInput(ent, "SetHealth");
+	if (AmplifierMini[ent])
+	{
+		SetEntProp(ent, Prop_Send, "m_iMaxHealth", AMPLIFIER_MINI_HEALTH);
+		char sHealth[16];
+		IntToString(AMPLIFIER_MINI_HEALTH, sHealth, sizeof(sHealth));
+		SetVariantString(sHealth);
+		AcceptEntityInput(ent, "SetHealth");
+	}
+	else
+	{
+		SetEntProp(ent, Prop_Send, "m_iMaxHealth", 216);
+		SetVariantString("-66");
+		AcceptEntityInput(ent, "RemoveHealth");
+	}
 	
 	new String:buildingClass[64];
 	GetEdictClassname(ent, buildingClass, sizeof(buildingClass));
@@ -883,22 +895,24 @@ CheckSapper(ent)
 public Action:SapperCheckStage1(Handle:hTimer, any:ref)
 {
 	new ent = EntRefToEntIndex(ref);
-	if (ent <= 0 || !IsValidEntity(ent)) return Plugin_Continue;
-	
-	new String:classname[64];
-	GetEdictClassname(ent, classname, sizeof(classname));
-	if (strcmp(classname, "obj_attachment_sapper")) return Plugin_Continue;
-	
-	new maxEntities = GetMaxEntities();
-	for (new i = 1; i < maxEntities; i++)
+	if (ent > 0 && IsValidEntity(ent))
 	{
-		new ampref = BuildingRef[i];
-		new ampent = EntRefToEntIndex(ampref);
-		if (ampent > 0 && GetEntProp(ampent, Prop_Send, "m_bHasSapper") == 1 && !AmplifierSapped[ampent])
+		new String:classname[64];
+		GetEdictClassname(ent, classname, sizeof(classname));
+		if (!strcmp(classname, "obj_attachment_sapper"))
 		{
-			AmplifierSapped[ampent] = true;
-			CreateTimer(0.5, SapperCheckStage2, ampref, TIMER_REPEAT);
-			break;
+			new maxEntities = GetMaxEntities();
+			for (new i = 1; i < maxEntities; i++)
+			{
+				new ampref = BuildingRef[i];
+				new ampent = EntRefToEntIndex(ampref);
+				if (ampent > 0 && GetEntProp(ampent, Prop_Send, "m_bHasSapper") == 1 && !AmplifierSapped[ampent])
+				{
+					AmplifierSapped[ampent] = true;
+					CreateTimer(0.5, SapperCheckStage2, ampref, TIMER_REPEAT);
+					break;
+				}
+			}
 		}
 	}
 	return Plugin_Continue;
@@ -929,13 +943,14 @@ stock void AddAmplifierEffect(int client)
         g_PlayerState[client].effectTimer = INVALID_HANDLE;
     }
     
+	TF2_AddCondition(client, TFCond_RegenBuffed, DefaultEffectLength);
     // Apply to first 3 slots
     for (int slot = 0; slot < 3; slot++)
     {
         int weapon = GetPlayerWeaponSlot(client, slot);
         if (weapon > MaxClients && IsValidEntity(weapon))
         {
-			float factor_firerate = 0.85;
+			float factor_firerate = 0.75;
 			float factor_reloadrate = 0.75;
             int defIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
 			if (defIndex == BEGGARS_BAZOOKA)
@@ -1215,6 +1230,40 @@ public Action Timer_RemoveEntity(Handle timer, int ref) {
         RemoveEntity(entity);
     }
     return Plugin_Stop;
+}
+
+public void killAllSentries()
+{
+    int maxEnts = GetMaxEntities();
+    char classname[64];
+    for (int ent = MaxClients + 1; ent < maxEnts; ent++)
+    {
+        if (!IsValidEntity(ent))
+            continue;
+
+        GetEdictClassname(ent, classname, sizeof(classname));
+        bool isSentry = !strcmp(classname, "obj_sentrygun");
+        if (isSentry)
+        {
+            AcceptEntityInput(ent, "Kill");
+        }
+    }
+}
+
+public Action Command_KillSentries(int client, int args)
+{
+    killAllSentries();
+
+    if (client > 0 && IsClientInGame(client))
+    {
+        CPrintToChat(client, "{gold}[Amplifier]{default} All sentries have been destroyed.");
+    }
+    else
+    {
+        PrintToServer("[Amplifier] All sentries have been destroyed.");
+    }
+
+    return Plugin_Handled;
 }
 
 // Ray Trace
